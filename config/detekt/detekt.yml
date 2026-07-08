@@ -1,0 +1,20 @@
+# Instapicker detekt configuration.
+# Only the rules we deliberately change from detekt's defaults live here;
+# everything else is inherited because `buildUponDefaultConfig = true`.
+
+naming:
+  FunctionNaming:
+    # Jetpack Compose @Composable functions are intentionally PascalCase,
+    # which would otherwise trip detekt's camelCase function-naming rule.
+    ignoreAnnotated: ['Composable']
+
+complexity:
+  # Compose UI functions can legitimately take several parameters.
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
+
+style:
+  MagicNumber:
+    # Theme colors, dp/sp sizes etc. are readable inline in Compose code.
+    ignorePropertyDeclaration: true
+    ignoreAnnotated: ['Composable', 'Preview']
