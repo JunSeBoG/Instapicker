@@ -2,13 +2,13 @@ name: Instapicker CI
 
 # When does this run?
 #  - On every push to development or main
-#  - On pull requests targeting main
+#  - On pull requests targeting development or main
 # Each job below shows up as its own status check: lint, unit-tests, build, detekt.
 on:
   push:
     branches: [ development, main ]
   pull_request:
-    branches: [ main ]
+    branches: [ development, main ]
 
 concurrency:
   group: ci-${{ github.ref }}
