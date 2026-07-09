@@ -155,7 +155,14 @@ class PickingReducerTest {
         qty: Int = 1,
         remaining: Int = qty,
         state: PickState = PickState.PENDING,
-    ) = PickItem(id, "Milk", VALID_EAN, qty, remaining, state)
+    ) = PickItem(
+        id = id,
+        name = "Milk",
+        ean13 = VALID_EAN,
+        requestedQty = qty,
+        remainingToScan = remaining,
+        state = state,
+    )
 
     private fun stateWith(
         vararg items: PickItem,
