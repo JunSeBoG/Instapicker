@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -41,6 +42,10 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        // Robolectric needs the merged Android resources to run Room in JVM tests.
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 detekt {
@@ -65,8 +70,12 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.kotlinx.serialization.json)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
