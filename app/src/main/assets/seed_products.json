@@ -1,0 +1,9 @@
+[
+  { "id": "p1", "name": "Rexona Clinical", "ean13": "7506306214972", "qty": 3 },
+  { "id": "p2", "name": "Aguardiente Special", "ean13": "7702835000806", "qty": 1 },
+  { "id": "p3", "name": "Listerine Cool Mint", "ean13": "7702035432117", "qty": 2 },
+  { "id": "p4", "name": "Huevos AA x12", "ean13": "7707614507248", "qty": 1 },
+  { "id": "p5", "name": "Queso Cheddar 400g", "ean13": "7701982303433", "qty": 1 },
+  { "id": "p6", "name": "Yogur Griego 500g", "ean13": "7706501687438", "qty": 1 },
+  { "id": "p7", "name": "Café Molido 250g", "ean13": "7706968473926", "qty": 1 }
+]
