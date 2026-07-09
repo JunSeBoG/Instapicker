@@ -73,7 +73,7 @@ class PickingRepositoryTest {
         Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME).build()
 
     private fun newRepository(db: AppDatabase) =
-        PickingRepository(db = db, productSource = source, clock = { FIXED_TIME })
+        RoomPickingRepository(db = db, productSource = source, clock = { FIXED_TIME })
 
     private fun milk(remaining: Int, state: PickState) = PickItem(
         id = ITEM_ID,
