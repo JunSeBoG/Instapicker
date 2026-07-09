@@ -61,6 +61,8 @@ CODE STANDARDS:
   STRATEGY_KEEP_ONLY_LATEST; stop analysis after first valid match.
 - No blocking calls on the main dispatcher. No memory leaks of Context/Activity.
 - Immutable data classes; stable keys in LazyColumn.
+- Call functions and constructors with named arguments (`param = value`), not
+  positionally — call sites stay self-documenting and safe from argument-order slips.
 - Every reducer branch and every validator branch must have a unit test.
 - Code must pass detekt (static analysis) against the committed baseline; the full
   CI (lint, unit tests, build, detekt) must be green.

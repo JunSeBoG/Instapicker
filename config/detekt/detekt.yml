@@ -17,6 +17,11 @@ complexity:
     # functions — one per transition. That reads clearer, not worse.
     thresholdInClasses: 20
     thresholdInFiles: 20
+  NamedArguments:
+    # Calls with 3+ arguments must name them (`param = value`) — self-documenting
+    # and immune to argument-order slips.
+    active: true
+    threshold: 2
 
 style:
   MagicNumber:
