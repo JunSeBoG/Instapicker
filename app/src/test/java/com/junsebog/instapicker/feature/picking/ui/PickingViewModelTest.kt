@@ -47,6 +47,8 @@ private class FakePickingRepository(private val seed: List<PickItem>) : PickingR
         appended += entry
     }
 
+    override suspend fun <T> transaction(block: suspend () -> T): T = block()
+
     fun current(id: String): PickItem = items.value.first { it.id == id }
 }
 
@@ -61,6 +63,14 @@ class PickingViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `loading the session on init writes a LOAD audit entry`() {
+        val repo = FakePickingRepository(seed = listOf(pendingMilk()))
+        PickingViewModel(repository = repo, savedState = SavedStateHandle())
+
+        assertTrue(repo.appended.any { it.action == AuditEntry.Action.LOAD })
     }
 
     @Test

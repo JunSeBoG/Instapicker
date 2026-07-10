@@ -79,6 +79,41 @@ never calls a stale lambda.
 pipeline created." Audit every `Closeable`/native handle a feature allocates — not
 just the headline one — and tie each to the same lifecycle boundary.
 
+### Entry 3 — documented a stronger persistence guarantee than the code delivered
+
+**Context.** `AGENTS.md` and `ARCHITECTURE.md` state the persistence model plainly:
+write-through — "domain mutations hit Room in a transaction BEFORE the new state is
+emitted", and "restoration = read the DB, never replay a cache".
+
+**AI proposal.** The `PickingViewModel.dispatch` the agent wrote does the opposite of
+what it documented: it emits the reducer's new state immediately (optimistically) and
+runs the persistence effects *afterwards*, in a fresh coroutine per dispatch — not
+inside a transaction and not serialized — while `items` is also merged from the Room
+flow, giving the field two writers.
+
+```kotlin
+_state.value = reduction.state              // optimistic emit FIRST
+viewModelScope.launch { effects.forEach ... } // persist LATER, async, no transaction
+```
+
+**Why it was flawed.** It contradicts the guarantee the docs advertise. A process
+death in the window between the emit and the persist would drop the last mutation
+(e.g. a scan), and two rapid intents could run their effects out of order. An
+independent model review of the submission flagged exactly this gap — a good reminder
+that self-authored architecture docs are claims to be verified, not evidence.
+
+**My correction.** Reconcile the implementation to the documented contract: run the
+effects (persisting inside a `withTransaction`) and let `items` derive **only** from
+the Room flow — the reducer keeps owning the ephemeral view bits (scanner, message,
+tab, log) — with effects pushed through a single serialized queue so ordering is
+deterministic. (The existing repository fake already models this write-through, so the
+production path is being aligned to what the tests already assume.)
+
+**Lesson.** A design document is a promise, and the ViewModel is where that promise is
+kept or broken. When the docs claim "persist before emit", the dispatch loop must
+actually await the write before publishing state — and a second, independent reviewer
+(human or model) is worth its weight for catching doc-vs-code drift the author is blind to.
+
 <!--
 Template for a new entry:
 

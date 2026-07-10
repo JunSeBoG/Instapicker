@@ -11,6 +11,7 @@ import com.junsebog.instapicker.feature.picking.domain.PickingReducer
 import com.junsebog.instapicker.feature.picking.domain.PickingUiState
 import com.junsebog.instapicker.feature.picking.domain.ScannerState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,11 +40,20 @@ class PickingViewModel @Inject constructor(
     private val _state = MutableStateFlow(restoredInitialState())
     val state: StateFlow<PickingUiState> = _state.asStateFlow()
 
+    /** Serializes intents: each is reduced, persisted (write-through) and published before the next. */
+    private val intents = Channel<PickingIntent>(Channel.UNLIMITED)
+
     init {
         viewModelScope.launch {
-            repository.ensureSeeded(SESSION_ID)
-            repository.observeItems(SESSION_ID).collect { items ->
-                _state.update { it.copy(items = items) }
+            for (intent in intents) {
+                val reduction = reducer.reduce(state = _state.value, intent = intent)
+                val persists = reduction.effects.any {
+                    it is PickingEffect.SaveItem || it is PickingEffect.AppendLog
+                }
+                // Write-through: commit the effects in one transaction BEFORE publishing the state.
+                if (persists) repository.transaction { reduction.effects.forEach { runEffect(it) } }
+                _state.value = reduction.state
+                rememberViewState(reduction.state)
             }
         }
         viewModelScope.launch {
@@ -51,15 +61,14 @@ class PickingViewModel @Inject constructor(
                 _state.update { it.copy(log = log) }
             }
         }
+        viewModelScope.launch {
+            val seeded = repository.ensureSeeded(SESSION_ID)
+            dispatch(PickingIntent.LoadSession(sessionId = SESSION_ID, items = seeded))
+        }
     }
 
     fun dispatch(intent: PickingIntent) {
-        val reduction = reducer.reduce(state = _state.value, intent = intent)
-        _state.value = reduction.state
-        rememberViewState(reduction.state)
-        viewModelScope.launch {
-            reduction.effects.forEach { runEffect(it) }
-        }
+        intents.trySend(intent)
     }
 
     private suspend fun runEffect(effect: PickingEffect) {
