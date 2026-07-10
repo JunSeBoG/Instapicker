@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -37,10 +38,16 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.junsebog.instapicker.core.model.PickItem
 import com.junsebog.instapicker.core.model.PickState
+import com.junsebog.instapicker.core.scanner.CameraBarcodeScanner
 import com.junsebog.instapicker.feature.picking.domain.PickTab
 import com.junsebog.instapicker.feature.picking.domain.PickingIntent
 import com.junsebog.instapicker.feature.picking.domain.PickingUiState
 import com.junsebog.instapicker.feature.picking.domain.ScannerState
+import com.junsebog.instapicker.feature.picking.domain.UiMessage
+import kotlinx.coroutines.delay
+
+/** How long the in-scanner soft notification stays before it auto-dismisses. */
+private const val SCANNER_MESSAGE_MS = 2_000L
 
 /** Stateful entry point: pulls the ViewModel and forwards its state to the pure UI. */
 @Composable
@@ -55,8 +62,9 @@ fun PickingRoute(viewModel: PickingViewModel = hiltViewModel()) {
 fun PickingScreen(state: PickingUiState, onIntent: (PickingIntent) -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.message) {
-        state.message?.let { message ->
+    LaunchedEffect(state.message, state.scanner) {
+        val message = state.message
+        if (message != null && state.scanner is ScannerState.Idle) {
             snackbarHostState.showSnackbar(message = message.text)
             onIntent(PickingIntent.DismissMessage)
         }
@@ -78,7 +86,13 @@ fun PickingScreen(state: PickingUiState, onIntent: (PickingIntent) -> Unit) {
 
     val scanner = state.scanner
     if (scanner is ScannerState.Active) {
-        ScannerOverlay(itemId = scanner.itemId, onCancel = { onIntent(PickingIntent.CancelScan) })
+        ScannerOverlay(
+            item = state.item(scanner.itemId),
+            message = state.message,
+            onBarcode = { raw -> onIntent(PickingIntent.BarcodeDetected(raw = raw)) },
+            onDismissMessage = { onIntent(PickingIntent.DismissMessage) },
+            onCancel = { onIntent(PickingIntent.CancelScan) },
+        )
     }
 }
 
@@ -192,29 +206,117 @@ private fun RowActions(item: PickItem, onIntent: (PickingIntent) -> Unit) {
                 OutlinedButton(onClick = { onIntent(PickingIntent.MoveToPending(item.id)) }) {
                     Text(text = "Move to pending")
                 }
-            PickState.ADDED ->
+            PickState.ADDED -> {
                 OutlinedButton(
                     onClick = { onIntent(PickingIntent.Rollback(itemId = item.id, to = PickState.PENDING)) },
                 ) {
                     Text(text = "Undo")
                 }
+                OutlinedButton(
+                    onClick = { onIntent(PickingIntent.Rollback(itemId = item.id, to = PickState.REMOVED)) },
+                ) {
+                    Text(text = "Remove")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Full-screen scanner: instruction + live progress on top, the camera in the middle,
+ * Cancel at the bottom. The camera reports raw EAN-13 codes via [onBarcode]; the
+ * reducer judges them. Because the overlay is a function of [item], each successful
+ * scan re-renders the "n / total" counter — the picker sees stacked progress without
+ * ever leaving the camera. When the reducer promotes the item it flips the scanner to
+ * Idle and the whole overlay leaves composition, releasing the camera.
+ *
+ * The overlay covers the Scaffold, so it surfaces the soft [message] itself as an
+ * in-camera banner (the requirement's non-blocking notification), then auto-dismisses
+ * it. `systemBarsPadding` keeps the title clear of the status bar.
+ */
+@Composable
+private fun ScannerOverlay(
+    item: PickItem?,
+    message: UiMessage?,
+    onBarcode: (String) -> Unit,
+    onDismissMessage: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    LaunchedEffect(message?.id) {
+        if (message != null) {
+            delay(SCANNER_MESSAGE_MS)
+            onDismissMessage()
+        }
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.scrim) {
+        Column(modifier = Modifier.fillMaxSize().systemBarsPadding().padding(all = 24.dp)) {
+            Text(
+                text = "Scanning: ${item?.name.orEmpty()}",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            if (item != null && item.requestedQty > 1) {
+                Spacer(modifier = Modifier.height(8.dp))
+                ScanProgress(item = item, modifier = Modifier.fillMaxWidth())
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                CameraBarcodeScanner(onBarcode = onBarcode, modifier = Modifier.fillMaxSize())
+                if (message != null) {
+                    ScanMessage(
+                        message = message,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .padding(all = 12.dp),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text(text = "Cancel") }
         }
     }
 }
 
 @Composable
-private fun ScannerOverlay(itemId: String, onCancel: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.scrim) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(all = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(text = "Scanning item $itemId", color = MaterialTheme.colorScheme.onPrimary)
-            Spacer(modifier = Modifier.height(16.dp))
-            // TODO(feature/scanner): the live CameraX + ML Kit preview replaces this shell.
-            Button(onClick = onCancel) { Text(text = "Cancel") }
-        }
+private fun ScanMessage(message: UiMessage, modifier: Modifier = Modifier) {
+    val container = when (message.kind) {
+        UiMessage.Kind.SUCCESS -> MaterialTheme.colorScheme.primaryContainer
+        UiMessage.Kind.WARNING -> MaterialTheme.colorScheme.errorContainer
+        UiMessage.Kind.INFO -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val onContainer = when (message.kind) {
+        UiMessage.Kind.SUCCESS -> MaterialTheme.colorScheme.onPrimaryContainer
+        UiMessage.Kind.WARNING -> MaterialTheme.colorScheme.onErrorContainer
+        UiMessage.Kind.INFO -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(modifier = modifier, color = container, shape = MaterialTheme.shapes.medium) {
+        Text(
+            text = message.text,
+            style = MaterialTheme.typography.titleMedium,
+            color = onContainer,
+            modifier = Modifier.padding(all = 12.dp),
+        )
+    }
+}
+
+/** Big, glanceable stacked-scan counter (e.g. "1 / 3") shown while a multi-unit scan runs. */
+@Composable
+private fun ScanProgress(item: PickItem, modifier: Modifier = Modifier) {
+    val scanned = item.requestedQty - item.remainingToScan
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "$scanned / ${item.requestedQty}",
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onPrimary,
+        )
+        Text(
+            text = "units scanned",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimary,
+        )
     }
 }
 
