@@ -1,6 +1,5 @@
 package com.junsebog.instapicker.feature.picking.data
 
-import com.junsebog.instapicker.core.database.AuditLogEntity
 import com.junsebog.instapicker.core.model.AuditEntry
 import com.junsebog.instapicker.core.model.PickItem
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +14,7 @@ interface PickingRepository {
     /** Observed by the ViewModel; the UI is rebuilt whenever the rows change. */
     fun observeItems(sessionId: String): Flow<List<PickItem>>
 
-    fun observeLog(sessionId: String): Flow<List<AuditLogEntity>>
+    fun observeLog(sessionId: String): Flow<List<AuditEntry>>
 
     /** Seeds the session only if it has no rows yet, preserving saved progress. */
     suspend fun ensureSeeded(sessionId: String): List<PickItem>
