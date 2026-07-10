@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.junsebog.instapicker.core.model.AuditEntry
 import com.junsebog.instapicker.core.model.PickItem
 import com.junsebog.instapicker.core.model.PickState
 import com.junsebog.instapicker.feature.picking.domain.PickTab
@@ -168,6 +169,39 @@ class PickingScreenTest {
         compose.onNodeWithText("Remove").performClick()
 
         assertEquals(PickingIntent.Rollback(itemId = "a1", to = PickState.REMOVED), captured.last())
+    }
+
+    @Test
+    fun `tapping Log toggles the audit log`() {
+        val captured = mutableListOf<PickingIntent>()
+        compose.setContent {
+            PickingScreen(state = PickingUiState(sessionId = SESSION), onIntent = { captured += it })
+        }
+
+        compose.onNodeWithText("Log").performClick()
+
+        assertEquals(PickingIntent.ToggleLog, captured.last())
+    }
+
+    @Test
+    fun `the audit log overlay lists entries`() {
+        val entry = AuditEntry(
+            sessionId = SESSION,
+            timestamp = 0L,
+            action = AuditEntry.Action.MOVE,
+            itemId = "p1",
+            fromState = PickState.PENDING,
+            toState = PickState.REMOVED,
+            outcome = AuditEntry.ValidationOutcome.NA,
+        )
+        compose.setContent {
+            PickingScreen(
+                state = PickingUiState(sessionId = SESSION, log = listOf(entry), logOpen = true),
+                onIntent = {},
+            )
+        }
+
+        compose.onNodeWithText(text = "MOVE", substring = true).assertIsDisplayed()
     }
 
     private fun stateWith(activeTab: PickTab) = PickingUiState(

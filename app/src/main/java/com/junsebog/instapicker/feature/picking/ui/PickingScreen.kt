@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.junsebog.instapicker.core.model.AuditEntry
 import com.junsebog.instapicker.core.model.PickItem
 import com.junsebog.instapicker.core.model.PickState
 import com.junsebog.instapicker.core.scanner.CameraBarcodeScanner
@@ -45,6 +47,9 @@ import com.junsebog.instapicker.feature.picking.domain.PickingUiState
 import com.junsebog.instapicker.feature.picking.domain.ScannerState
 import com.junsebog.instapicker.feature.picking.domain.UiMessage
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** How long the in-scanner soft notification stays before it auto-dismisses. */
 private const val SCANNER_MESSAGE_MS = 2_000L
@@ -71,7 +76,14 @@ fun PickingScreen(state: PickingUiState, onIntent: (PickingIntent) -> Unit) {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(text = "Instapicker") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(text = "Instapicker") },
+                actions = {
+                    TextButton(onClick = { onIntent(PickingIntent.ToggleLog) }) { Text(text = "Log") }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -93,6 +105,10 @@ fun PickingScreen(state: PickingUiState, onIntent: (PickingIntent) -> Unit) {
             onDismissMessage = { onIntent(PickingIntent.DismissMessage) },
             onCancel = { onIntent(PickingIntent.CancelScan) },
         )
+    }
+
+    if (state.logOpen) {
+        AuditLogOverlay(entries = state.log, onClose = { onIntent(PickingIntent.ToggleLog) })
     }
 }
 
@@ -319,6 +335,65 @@ private fun ScanProgress(item: PickItem, modifier: Modifier = Modifier) {
         )
     }
 }
+
+/** Read-only view of the append-only audit log, opened from the top bar. */
+@Composable
+private fun AuditLogOverlay(entries: List<AuditEntry>, onClose: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+        Column(modifier = Modifier.fillMaxSize().systemBarsPadding().padding(all = 16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "Audit log", style = MaterialTheme.typography.headlineSmall)
+                TextButton(onClick = onClose) { Text(text = "Close") }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            if (entries.isEmpty()) {
+                Text(
+                    text = "No activity yet.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(items = entries) { entry -> AuditRow(entry = entry) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuditRow(entry: AuditEntry) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(text = auditLine(entry), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = formatTime(entry.timestamp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** One-line human summary, e.g. "SCAN_OK · p1 · PENDING → ADDED · PASS". */
+private fun auditLine(entry: AuditEntry): String = buildString {
+    append(entry.action.name)
+    entry.itemId?.let { append(" · ").append(it) }
+    if (entry.fromState != null || entry.toState != null) {
+        append(" · ")
+        append(entry.fromState?.name ?: "—")
+        append(" → ")
+        append(entry.toState?.name ?: "—")
+    }
+    if (entry.outcome != AuditEntry.ValidationOutcome.NA) {
+        append(" · ").append(entry.outcome.name)
+    }
+}
+
+private fun formatTime(timestamp: Long): String =
+    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestamp))
 
 private fun PickTab.toPickState(): PickState = when (this) {
     PickTab.PENDING -> PickState.PENDING
