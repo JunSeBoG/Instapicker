@@ -10,6 +10,7 @@ import com.junsebog.instapicker.feature.picking.domain.PickTab
 import com.junsebog.instapicker.feature.picking.domain.PickingIntent
 import com.junsebog.instapicker.feature.picking.domain.PickingUiState
 import com.junsebog.instapicker.feature.picking.domain.ScannerState
+import com.junsebog.instapicker.feature.picking.domain.UiMessage
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -69,10 +70,46 @@ class PickingScreenTest {
             )
         }
 
-        compose.onNodeWithText(text = "Scanning item", substring = true).assertIsDisplayed()
+        compose.onNodeWithText(text = "Scanning:", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Cancel").performClick()
 
         assertEquals(PickingIntent.CancelScan, captured.last())
+    }
+
+    @Test
+    fun `the scanner overlay shows live stacked progress`() {
+        val stacked = item(id = "s1", name = "Rexona", qty = 3, remaining = 2, state = PickState.PENDING)
+        compose.setContent {
+            PickingScreen(
+                state = PickingUiState(
+                    sessionId = SESSION,
+                    items = listOf(stacked),
+                    scanner = ScannerState.Active(itemId = "s1"),
+                ),
+                onIntent = {},
+            )
+        }
+
+        // 3 requested, 2 still to scan -> "1 / 3" in the overlay (spaced, unlike the list badge).
+        compose.onNodeWithText("1 / 3").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a soft scan message shows on top of the camera, not behind it`() {
+        val pending = item(id = "p1", name = PENDING_NAME, qty = 1, remaining = 1, state = PickState.PENDING)
+        compose.setContent {
+            PickingScreen(
+                state = PickingUiState(
+                    sessionId = SESSION,
+                    items = listOf(pending),
+                    scanner = ScannerState.Active(itemId = "p1"),
+                    message = UiMessage(id = 1L, text = MISMATCH_TEXT, kind = UiMessage.Kind.WARNING),
+                ),
+                onIntent = {},
+            )
+        }
+
+        compose.onNodeWithText(MISMATCH_TEXT).assertIsDisplayed()
     }
 
     @Test
@@ -117,6 +154,22 @@ class PickingScreenTest {
         assertEquals(PickingIntent.StartScan(itemId = "p1"), captured.last())
     }
 
+    @Test
+    fun `an added row can roll back to Removed`() {
+        val captured = mutableListOf<PickingIntent>()
+        val added = item(id = "a1", name = ADDED_NAME, qty = 1, remaining = 0, state = PickState.ADDED)
+        compose.setContent {
+            PickingScreen(
+                state = PickingUiState(sessionId = SESSION, items = listOf(added), activeTab = PickTab.ADDED),
+                onIntent = { captured += it },
+            )
+        }
+
+        compose.onNodeWithText("Remove").performClick()
+
+        assertEquals(PickingIntent.Rollback(itemId = "a1", to = PickState.REMOVED), captured.last())
+    }
+
     private fun stateWith(activeTab: PickTab) = PickingUiState(
         sessionId = SESSION,
         activeTab = activeTab,
@@ -142,5 +195,6 @@ class PickingScreenTest {
         const val REMOVED_NAME = "Listerine Cool Mint"
         const val ADDED_NAME = "Rexona Clinical"
         const val EAN = "7702835000806"
+        const val MISMATCH_TEXT = "Scanned barcode is not the expected one."
     }
 }
