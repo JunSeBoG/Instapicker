@@ -1,7 +1,13 @@
 package com.junsebog.instapicker.core.scanner
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -32,6 +38,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.Executor
@@ -53,20 +60,54 @@ fun CameraBarcodeScanner(onBarcode: (String) -> Unit, modifier: Modifier = Modif
                 PackageManager.PERMISSION_GRANTED,
         )
     }
+    var permanentlyDenied by remember { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted -> granted = isGranted },
+        onResult = { isGranted ->
+            granted = isGranted
+            // A denial with no rationale prompt left means "don't ask again" — route to settings.
+            if (!isGranted) {
+                val activity = context.findActivity()
+                permanentlyDenied = activity != null &&
+                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
+            }
+        },
     )
     LaunchedEffect(Unit) {
         if (!granted) launcher.launch(Manifest.permission.CAMERA)
     }
 
-    if (granted) {
-        CameraPreview(onBarcode = onBarcode, modifier = modifier)
-    } else {
-        PermissionRationale(onGrant = { launcher.launch(Manifest.permission.CAMERA) }, modifier = modifier)
+    when {
+        granted -> CameraPreview(onBarcode = onBarcode, modifier = modifier)
+        permanentlyDenied -> PermissionRationale(
+            message = "Camera access is turned off for the app. Enable it in settings to scan.",
+            actionLabel = "Open settings",
+            onAction = { context.findActivity()?.startActivity(appSettingsIntent(context)) },
+            modifier = modifier,
+        )
+        else -> PermissionRationale(
+            message = "Camera access is needed to scan the item's barcode.",
+            actionLabel = "Grant camera access",
+            onAction = { launcher.launch(Manifest.permission.CAMERA) },
+            modifier = modifier,
+        )
     }
 }
+
+private fun Context.findActivity(): Activity? {
+    var current: Context = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
+}
+
+private fun appSettingsIntent(context: Context): Intent =
+    Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", context.packageName, null),
+    )
 
 @Composable
 private fun CameraPreview(onBarcode: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -128,19 +169,24 @@ private fun ProcessCameraProvider.bindScanner(
 }
 
 @Composable
-private fun PermissionRationale(onGrant: () -> Unit, modifier: Modifier = Modifier) {
+private fun PermissionRationale(
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.padding(all = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Camera access is needed to scan the item's barcode.",
+            text = message,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onGrant) { Text(text = "Grant camera access") }
+        Button(onClick = onAction) { Text(text = actionLabel) }
     }
 }
