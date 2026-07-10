@@ -190,10 +190,11 @@ The strategy is a **two-tier persistence split**:
 **Tier 1 — Durable domain state (Room).** Every accepted intent that mutates
 domain state writes through to Room inside a single transaction *before* the new
 `UiState` is emitted. The `pick_items` table is the authoritative record of each
-item's state and remaining balance. Because Room exposes the table as a `Flow`,
-the ViewModel rebuilds `UiState` by *reading the database*, not by holding a
-fragile in-memory cache. Process death loses nothing: on relaunch the ViewModel
-re-collects the same Flow and the session materializes identically.
+item's state and remaining balance: because the write to Room commits *before* the
+state is published, the in-memory `UiState` is a **write-through view**, never
+ahead of disk. Process death loses nothing: on relaunch the ViewModel *reads the
+database* to materialize the session identically — there is no cache to replay.
+(The append-only audit log is observed live as a Room `Flow`.)
 
 **Tier 2 — Active-view restore (SavedStateHandle).** Which tab is active, and
 whether the full-screen scanner was open for a given item — these are UI concerns,
@@ -202,9 +203,10 @@ system-initiated process death and configuration changes automatically. This is
 what lets the app return the picker to their *exact active view*: if the scanner
 was open for item X when a call came in, relaunching drops them straight back into
 the scanner for item X — the camera re-bound fresh, the scan balance still intact
-from Room. If the camera is unavailable on return (permission revoked, hardware
-busy), it falls back to the list positioned on item X rather than breaking. Keeping
-this out of the database also keeps domain storage clean of UI noise.
+from Room. If the camera permission has been revoked on return, the scanner shows a
+rationale instead of breaking — routing a permanent denial to system settings — and
+the picker can cancel back to the item list. Keeping this out of the database also
+keeps domain storage clean of UI noise.
 
 **Why not just DataStore / a JSON blob?** A single serialized blob forces a full
 rewrite on every mutation (write amplification, corruption risk on a killed
@@ -223,7 +225,7 @@ Intent ─▶ state function ─▶ newState + effects
               (pick_items)      (append-only)    (tab/scanner view)
                      │
                      ▼
-          Room Flow re-emits ─▶ ViewModel rebuilds UiState ─▶ Compose recomposes
+          Transaction commits ─▶ ViewModel publishes newState ─▶ Compose recomposes
 ```
 
 ---

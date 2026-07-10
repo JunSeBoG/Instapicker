@@ -1,0 +1,33 @@
+# Instapicker detekt configuration.
+# Only the rules we deliberately change from detekt's defaults live here;
+# everything else is inherited because `buildUponDefaultConfig = true`.
+
+naming:
+  FunctionNaming:
+    # Jetpack Compose @Composable functions are intentionally PascalCase,
+    # which would otherwise trip detekt's camelCase function-naming rule.
+    ignoreAnnotated: ['Composable']
+
+complexity:
+  # Compose UI functions can legitimately take several parameters.
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    # A state-machine reducer (and its test class) naturally has many small
+    # functions — one per transition. That reads clearer, not worse.
+    thresholdInClasses: 20
+    thresholdInFiles: 20
+  NamedArguments:
+    # Calls with 3+ arguments must name them (`param = value`) — self-documenting
+    # and immune to argument-order slips.
+    active: true
+    threshold: 2
+
+style:
+  MagicNumber:
+    # Theme colors, dp/sp sizes etc. are readable inline in Compose code.
+    ignorePropertyDeclaration: true
+    ignoreAnnotated: ['Composable', 'Preview']
+  ReturnCount:
+    # Guard clauses (early returns) keep each reducer transition flat and readable.
+    max: 4
