@@ -1,5 +1,6 @@
 package com.junsebog.instapicker.feature.picking.domain
 
+import com.junsebog.instapicker.core.model.AuditEntry
 import com.junsebog.instapicker.core.model.PickItem
 import com.junsebog.instapicker.core.model.PickState
 
@@ -27,6 +28,8 @@ data class PickingUiState(
     val activeTab: PickTab = PickTab.PENDING,
     val scanner: ScannerState = ScannerState.Idle,
     val message: UiMessage? = null,
+    val log: List<AuditEntry> = emptyList(),
+    val logOpen: Boolean = false,
 ) {
     fun item(id: String): PickItem? = items.firstOrNull { it.id == id }
 

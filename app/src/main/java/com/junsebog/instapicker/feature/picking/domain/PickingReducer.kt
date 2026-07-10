@@ -28,6 +28,7 @@ class PickingReducer(private val now: () -> Long) {
         is PickingIntent.Rollback -> onRollback(state = state, itemId = intent.itemId, to = intent.to)
         is PickingIntent.ChangeTab -> Reduction(state = state.copy(activeTab = intent.tab))
         PickingIntent.DismissMessage -> Reduction(state = state.copy(message = null))
+        PickingIntent.ToggleLog -> Reduction(state = state.copy(logOpen = !state.logOpen))
     }
 
     private fun onLoad(state: PickingUiState, intent: PickingIntent.LoadSession): Reduction {

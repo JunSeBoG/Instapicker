@@ -40,3 +40,14 @@ fun AuditEntry.toEntity(): AuditLogEntity = AuditLogEntity(
     outcome = outcome.name,
     detail = detail,
 )
+
+fun AuditLogEntity.toDomain(): AuditEntry = AuditEntry(
+    sessionId = sessionId,
+    timestamp = timestamp,
+    action = AuditEntry.Action.valueOf(action),
+    itemId = itemId,
+    fromState = fromState?.let { PickState.valueOf(it) },
+    toState = toState?.let { PickState.valueOf(it) },
+    outcome = AuditEntry.ValidationOutcome.valueOf(outcome),
+    detail = detail,
+)

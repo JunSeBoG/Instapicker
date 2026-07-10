@@ -3,6 +3,7 @@ package com.junsebog.instapicker.feature.picking.domain
 import com.junsebog.instapicker.core.model.PickItem
 import com.junsebog.instapicker.core.model.PickState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -146,6 +147,16 @@ class PickingReducerTest {
 
         val cleared = reducer.reduce(warned, PickingIntent.DismissMessage).state
         assertNull(cleared.message)
+    }
+
+    @Test
+    fun `toggling the log flips its visibility and produces no effects`() {
+        val opened = reducer.reduce(stateWith(item()), PickingIntent.ToggleLog)
+        assertTrue(opened.state.logOpen)
+        assertTrue(opened.effects.isEmpty())
+
+        val closed = reducer.reduce(opened.state, PickingIntent.ToggleLog)
+        assertFalse(closed.state.logOpen)
     }
 
     // --- helpers ----------------------------------------------------------------

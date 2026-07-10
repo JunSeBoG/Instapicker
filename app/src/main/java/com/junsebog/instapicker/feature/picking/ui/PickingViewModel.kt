@@ -46,6 +46,11 @@ class PickingViewModel @Inject constructor(
                 _state.update { it.copy(items = items) }
             }
         }
+        viewModelScope.launch {
+            repository.observeLog(SESSION_ID).collect { log ->
+                _state.update { it.copy(log = log) }
+            }
+        }
     }
 
     fun dispatch(intent: PickingIntent) {
@@ -68,6 +73,7 @@ class PickingViewModel @Inject constructor(
     private fun rememberViewState(state: PickingUiState) {
         savedState[KEY_TAB] = state.activeTab.name
         savedState[KEY_SCAN_ITEM] = (state.scanner as? ScannerState.Active)?.itemId
+        savedState[KEY_LOG_OPEN] = state.logOpen
     }
 
     private fun restoredInitialState(): PickingUiState {
@@ -75,12 +81,14 @@ class PickingViewModel @Inject constructor(
         val scanner = savedState.get<String>(KEY_SCAN_ITEM)
             ?.let { ScannerState.Active(itemId = it) }
             ?: ScannerState.Idle
-        return PickingUiState(sessionId = SESSION_ID, activeTab = tab, scanner = scanner)
+        val logOpen = savedState.get<Boolean>(KEY_LOG_OPEN) ?: false
+        return PickingUiState(sessionId = SESSION_ID, activeTab = tab, scanner = scanner, logOpen = logOpen)
     }
 
     private companion object {
         const val SESSION_ID = "session-local"
         const val KEY_TAB = "active_tab"
         const val KEY_SCAN_ITEM = "scanner_item"
+        const val KEY_LOG_OPEN = "log_open"
     }
 }

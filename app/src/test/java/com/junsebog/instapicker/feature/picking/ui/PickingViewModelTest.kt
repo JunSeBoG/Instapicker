@@ -1,7 +1,6 @@
 package com.junsebog.instapicker.feature.picking.ui
 
 import androidx.lifecycle.SavedStateHandle
-import com.junsebog.instapicker.core.database.AuditLogEntity
 import com.junsebog.instapicker.core.model.AuditEntry
 import com.junsebog.instapicker.core.model.PickItem
 import com.junsebog.instapicker.core.model.PickState
@@ -20,6 +19,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -31,8 +31,8 @@ private class FakePickingRepository(private val seed: List<PickItem>) : PickingR
 
     override fun observeItems(sessionId: String): Flow<List<PickItem>> = items.asStateFlow()
 
-    override fun observeLog(sessionId: String): Flow<List<AuditLogEntity>> =
-        MutableStateFlow<List<AuditLogEntity>>(emptyList()).asStateFlow()
+    override fun observeLog(sessionId: String): Flow<List<AuditEntry>> =
+        MutableStateFlow<List<AuditEntry>>(emptyList()).asStateFlow()
 
     override suspend fun ensureSeeded(sessionId: String): List<PickItem> {
         if (items.value.isEmpty()) items.value = seed
@@ -87,11 +87,23 @@ class PickingViewModelTest {
 
     @Test
     fun `the exact active view is restored from saved state`() {
-        val saved = SavedStateHandle(mapOf(KEY_TAB to "REMOVED", KEY_SCAN to ITEM_ID))
+        val saved = SavedStateHandle(mapOf(KEY_TAB to "REMOVED", KEY_SCAN to ITEM_ID, KEY_LOG_OPEN to true))
         val viewModel = PickingViewModel(repository = FakePickingRepository(seed = emptyList()), savedState = saved)
 
         assertEquals(PickTab.REMOVED, viewModel.state.value.activeTab)
         assertEquals(ScannerState.Active(ITEM_ID), viewModel.state.value.scanner)
+        assertTrue(viewModel.state.value.logOpen)
+    }
+
+    @Test
+    fun `toggling the log is remembered in saved state`() {
+        val saved = SavedStateHandle()
+        val viewModel = PickingViewModel(repository = FakePickingRepository(seed = emptyList()), savedState = saved)
+
+        viewModel.dispatch(PickingIntent.ToggleLog)
+
+        assertTrue(viewModel.state.value.logOpen)
+        assertEquals(true, saved.get<Boolean>(KEY_LOG_OPEN))
     }
 
     private fun pendingMilk() = PickItem(
@@ -109,5 +121,6 @@ class PickingViewModelTest {
         const val EAN = "8401043321817"
         const val KEY_TAB = "active_tab"
         const val KEY_SCAN = "scanner_item"
+        const val KEY_LOG_OPEN = "log_open"
     }
 }

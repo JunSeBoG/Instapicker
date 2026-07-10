@@ -17,4 +17,5 @@ sealed interface PickingIntent {
     data class Rollback(val itemId: String, val to: PickState) : PickingIntent
     data class ChangeTab(val tab: PickTab) : PickingIntent
     data object DismissMessage : PickingIntent
+    data object ToggleLog : PickingIntent
 }

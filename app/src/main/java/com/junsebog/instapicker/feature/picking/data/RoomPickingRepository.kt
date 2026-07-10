@@ -1,7 +1,6 @@
 package com.junsebog.instapicker.feature.picking.data
 
 import com.junsebog.instapicker.core.database.AppDatabase
-import com.junsebog.instapicker.core.database.AuditLogEntity
 import com.junsebog.instapicker.core.database.toDomain
 import com.junsebog.instapicker.core.database.toEntity
 import com.junsebog.instapicker.core.model.AuditEntry
@@ -23,8 +22,8 @@ class RoomPickingRepository(
     override fun observeItems(sessionId: String): Flow<List<PickItem>> =
         db.pickItemDao().observeSession(sessionId).map { rows -> rows.map { it.toDomain() } }
 
-    override fun observeLog(sessionId: String): Flow<List<AuditLogEntity>> =
-        db.auditLogDao().observe(sessionId)
+    override fun observeLog(sessionId: String): Flow<List<AuditEntry>> =
+        db.auditLogDao().observe(sessionId).map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun ensureSeeded(sessionId: String): List<PickItem> {
         if (db.pickItemDao().count(sessionId) == 0) {
