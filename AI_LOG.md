@@ -14,10 +14,70 @@ Each entry follows the same shape:
 
 ## Entries
 
-_No entries yet — this log is filled with real incidents as they happen during
-development, not with invented ones. When the AI proposes something that violates
-the rules in `AGENTS.md` or is otherwise wrong, it gets documented here with the
-correction._
+### Entry 1 — PR description ignored the repo's own template
+
+**Context.** Wrapping up the `feature/picking-ui` branch, I asked the agent for a
+pull-request description. The repo ships a fixed PR template
+([`.github/pull_request_template.md`](./.github/pull_request_template.md)) whose
+sections `AGENTS.md` (§4) explicitly tells agents to follow.
+
+**AI proposal.** It produced a description with invented sections — `What`,
+`Screenshots`, `Out of scope` — dropping `Why`, `How`, and the `Checklist`, and
+reordering the rest.
+
+**Why it was flawed.** It violated the "follow the defined markdown templates"
+rule in `AGENTS.md` §4. A PR that doesn't match the template loses the checklist
+gate (reducer-only state changes, no new deps/modules, docs updated) and forces a
+reviewer to reconcile two different shapes. It also revealed the agent had stopped
+re-reading `AGENTS.md` before generating artifacts, exactly the failure mode the
+file exists to prevent.
+
+**My correction.** I caught the drift, had it re-read `AGENTS.md` and the live
+template, and regenerated the description in the real order — `What / Why / How /
+Testing / Checklist` — folding the screenshots into `How` instead of a new
+top-level section.
+
+**Lesson.** Templates are a hard constraint, not a starting point the agent may
+"improve." Re-read `AGENTS.md` and the referenced templates immediately before
+generating any commit or PR, and diff the output against the template shape before
+trusting it.
+
+### Entry 2 — leaked the ML Kit detector's native resources
+
+**Context.** Building the camera scanner (`core/scanner`). The agent wrote a
+`CameraBarcodeScanner` composable that binds CameraX and, per its own doc comment,
+"releases the hardware immediately" in `onDispose` — it unbound the camera and shut
+down the analysis executor there.
+
+**AI proposal.** For each scan session it created a fresh ML Kit detector inside the
+bind step — `BarcodeScanning.getClient(...)` — but never closed it:
+
+```kotlin
+.also { it.setAnalyzer(executor, BarcodeAnalyzer(onBarcode = onBarcode)) }
+// ...onDispose { provider?.unbindAll(); executor.shutdown() }  // detector never closed
+```
+
+**Why it was flawed.** `BarcodeScanner` is `Closeable` and holds native resources.
+Unbinding the camera does not release the detector, so every open/close of the
+scanner leaked one. This breaks `AGENTS.md` §3.6 ("camera resources are lifecycle-
+bound and explicitly released") in spirit — the agent released the obvious resource
+(the camera) and quietly missed the less obvious one (the ML Kit client).
+
+**My correction.** I made `BarcodeAnalyzer` implement `Closeable` and forward
+`close()` to the detector, hoisted the analyzer to a remembered instance so I hold a
+reference, and closed it in the same `onDispose` that frees the camera:
+
+```kotlin
+override fun close() { scanner.close() }
+// onDispose { provider?.unbindAll(); executor.shutdown(); analyzer.close() }
+```
+
+I also wrapped the callback in `rememberUpdatedState` so the remembered analyzer
+never calls a stale lambda.
+
+**Lesson.** "Released the camera" is not the same as "released everything the camera
+pipeline created." Audit every `Closeable`/native handle a feature allocates — not
+just the headline one — and tie each to the same lifecycle boundary.
 
 <!--
 Template for a new entry:
