@@ -12,10 +12,16 @@ Built for the *InstaPicker — Senior Android Engineer Challenge*.
 ---
 
 ## Demo
-
-📹 **2-minute walkthrough** — _video link coming soon._
+https://github.com/user-attachments/assets/b4fb27c8-c1a1-48d0-8a88-c43745c79476
 
 ## Screenshots
+|Empty Added Tab|Removed Tab|Pending Tab|Empty Pending Tab|Empty Removed Tab|
+|:---:|:---:|:---:|:---:|:---:|
+|<img width="1080" height="2412" alt="Screenshot_20260710_003318" src="https://github.com/user-attachments/assets/20a3c639-5a1b-409c-9b11-23e870168355" />|<img width="1080" height="2412" alt="Screenshot_20260710_003306" src="https://github.com/user-attachments/assets/70c9d12b-1dc6-4087-9995-66017747b6e9" />|<img width="1080" height="2412" alt="Screenshot_20260710_003201" src="https://github.com/user-attachments/assets/b143abd1-dc12-4001-9635-47e4ac2bfdf6" />|<img width="1080" height="2412" alt="Screenshot_20260710_003738" src="https://github.com/user-attachments/assets/8df081e6-5b9c-4a7b-996b-b49a11f8739b" />|<img width="1080" height="2412" alt="Screenshot_20260710_003728" src="https://github.com/user-attachments/assets/2aa1c1d7-11ee-4b9d-b113-480a3c273066" />|
+
+|||
+|:---:|:---:|
+|<img width="346" height="774" alt="Screen_recording_20260710_003056" src="https://github.com/user-attachments/assets/2e54211a-1590-42b8-9d48-38605d3bc342" />|<img width="346" height="774" alt="Screen_recording_20260710_112109" src="https://github.com/user-attachments/assets/5db4b8e4-2e2c-4c90-b758-dfdb245d1889" />|
 
 
 ---
@@ -32,7 +38,7 @@ Built for the *InstaPicker — Senior Android Engineer Challenge*.
 
 **From Android Studio**
 
-1. Clone the repo and open the project root; let Gradle sync.
+1. Clone the repo and open the project root; let Gradle sync.          
 2. Run the `app` configuration on a device/emulator.
 3. The camera permission is requested contextually on the first scan, not on launch.
 
