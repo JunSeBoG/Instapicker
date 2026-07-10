@@ -4,6 +4,7 @@ import com.junsebog.instapicker.core.model.PickItem
 import com.junsebog.instapicker.core.model.PickState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -147,6 +148,32 @@ class PickingReducerTest {
 
         val cleared = reducer.reduce(warned, PickingIntent.DismissMessage).state
         assertNull(cleared.message)
+    }
+
+    @Test
+    fun `consecutive messages get distinct ids even under a fixed clock`() {
+        val start = stateWith(item(), scanner = ScannerState.Active(ITEM_ID))
+        val first = reducer.reduce(start, PickingIntent.BarcodeDetected(OTHER_VALID_EAN)).state
+        val second = reducer.reduce(first, PickingIntent.BarcodeDetected(OTHER_VALID_EAN)).state
+
+        assertNotNull(first.message)
+        assertNotNull(second.message)
+        assertNotEquals(first.message!!.id, second.message!!.id)
+    }
+
+    @Test
+    fun `load injects items and logs LOAD without resetting the active view`() {
+        val start = PickingUiState(
+            sessionId = "s",
+            activeTab = PickTab.REMOVED,
+            scanner = ScannerState.Active(ITEM_ID),
+        )
+        val result = reducer.reduce(start, PickingIntent.LoadSession(sessionId = "s", items = listOf(item())))
+
+        assertEquals(1, result.state.items.size)
+        assertEquals(PickTab.REMOVED, result.state.activeTab)             // view preserved
+        assertEquals(ScannerState.Active(ITEM_ID), result.state.scanner)  // view preserved
+        assertTrue(result.effects.any { it is PickingEffect.AppendLog })
     }
 
     @Test

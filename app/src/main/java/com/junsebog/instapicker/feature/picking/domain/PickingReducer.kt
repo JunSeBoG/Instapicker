@@ -32,13 +32,7 @@ class PickingReducer(private val now: () -> Long) {
     }
 
     private fun onLoad(state: PickingUiState, intent: PickingIntent.LoadSession): Reduction {
-        val next = state.copy(
-            sessionId = intent.sessionId,
-            items = intent.items,
-            activeTab = PickTab.PENDING,
-            scanner = ScannerState.Idle,
-            message = null,
-        )
+        val next = state.copy(sessionId = intent.sessionId, items = intent.items)
         val entry = log(sessionId = intent.sessionId, action = Action.LOAD)
         return Reduction(state = next, effects = listOf(PickingEffect.AppendLog(entry)))
     }
@@ -47,7 +41,7 @@ class PickingReducer(private val now: () -> Long) {
     private fun move(state: PickingUiState, itemId: String, to: PickState): Reduction {
         val item = state.item(itemId) ?: return Reduction(state = state)
         if (item.state == PickState.ADDED) {
-            return Reduction(state = state.copy(message = warn("Use rollback to move an added item.")))
+            return Reduction(state = state.copy(message = warn(state, "Use rollback to move an added item.")))
         }
         if (item.state == to) return Reduction(state = state)
 
@@ -121,7 +115,7 @@ class PickingReducer(private val now: () -> Long) {
             detail = "raw=$raw",
         )
         return Reduction(
-            state = state.copy(message = warn(text)),
+            state = state.copy(message = warn(state, text)),
             effects = listOf(PickingEffect.AppendLog(entry)),
         )
     }
@@ -148,7 +142,7 @@ class PickingReducer(private val now: () -> Long) {
         return Reduction(
             state = state.withItem(added).copy(
                 scanner = ScannerState.Idle,
-                message = success("${added.name} added."),
+                message = success(state, "${added.name} added."),
             ),
             effects = listOf(
                 PickingEffect.SaveItem(added),
@@ -171,7 +165,7 @@ class PickingReducer(private val now: () -> Long) {
         val scanned = item.requestedQty - remaining
         return Reduction(
             state = state.withItem(updated).copy(
-                message = success("Scanned $scanned of ${item.requestedQty}."),
+                message = success(state, "Scanned $scanned of ${item.requestedQty}."),
             ),
             effects = listOf(PickingEffect.SaveItem(updated), PickingEffect.AppendLog(entry)),
         )
@@ -200,9 +194,15 @@ class PickingReducer(private val now: () -> Long) {
     private fun PickingUiState.withItem(item: PickItem): PickingUiState =
         copy(items = items.map { if (it.id == item.id) item else it })
 
-    private fun warn(text: String) = UiMessage(id = now(), text = text, kind = UiMessage.Kind.WARNING)
+    /** Monotonic per-state id so a new message always differs from the one it replaces —
+     *  even within the same millisecond — keeping it usable as a Compose effect key. */
+    private fun PickingUiState.nextMessageId(): Long = (message?.id ?: 0L) + 1
 
-    private fun success(text: String) = UiMessage(id = now(), text = text, kind = UiMessage.Kind.SUCCESS)
+    private fun warn(state: PickingUiState, text: String) =
+        UiMessage(id = state.nextMessageId(), text = text, kind = UiMessage.Kind.WARNING)
+
+    private fun success(state: PickingUiState, text: String) =
+        UiMessage(id = state.nextMessageId(), text = text, kind = UiMessage.Kind.SUCCESS)
 
     @Suppress("LongParameterList")
     private fun log(
