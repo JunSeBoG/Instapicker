@@ -24,4 +24,7 @@ interface PickingRepository {
 
     /** Appends one record to the audit log. */
     suspend fun append(entry: AuditEntry)
+
+    /** Runs [block] inside a single database transaction so batched writes commit atomically. */
+    suspend fun <T> transaction(block: suspend () -> T): T
 }

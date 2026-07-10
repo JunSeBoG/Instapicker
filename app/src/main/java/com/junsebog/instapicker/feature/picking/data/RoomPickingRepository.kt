@@ -1,5 +1,6 @@
 package com.junsebog.instapicker.feature.picking.data
 
+import androidx.room.withTransaction
 import com.junsebog.instapicker.core.database.AppDatabase
 import com.junsebog.instapicker.core.database.toDomain
 import com.junsebog.instapicker.core.database.toEntity
@@ -39,4 +40,6 @@ class RoomPickingRepository(
 
     override suspend fun append(entry: AuditEntry) =
         db.auditLogDao().append(entry.toEntity())
+
+    override suspend fun <T> transaction(block: suspend () -> T): T = db.withTransaction(block)
 }
