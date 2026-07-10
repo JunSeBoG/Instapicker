@@ -190,10 +190,11 @@ The strategy is a **two-tier persistence split**:
 **Tier 1 — Durable domain state (Room).** Every accepted intent that mutates
 domain state writes through to Room inside a single transaction *before* the new
 `UiState` is emitted. The `pick_items` table is the authoritative record of each
-item's state and remaining balance. Because Room exposes the table as a `Flow`,
-the ViewModel rebuilds `UiState` by *reading the database*, not by holding a
-fragile in-memory cache. Process death loses nothing: on relaunch the ViewModel
-re-collects the same Flow and the session materializes identically.
+item's state and remaining balance: because the write to Room commits *before* the
+state is published, the in-memory `UiState` is a **write-through view**, never
+ahead of disk. Process death loses nothing: on relaunch the ViewModel *reads the
+database* to materialize the session identically — there is no cache to replay.
+(The append-only audit log is observed live as a Room `Flow`.)
 
 **Tier 2 — Active-view restore (SavedStateHandle).** Which tab is active, and
 whether the full-screen scanner was open for a given item — these are UI concerns,
@@ -224,7 +225,7 @@ Intent ─▶ state function ─▶ newState + effects
               (pick_items)      (append-only)    (tab/scanner view)
                      │
                      ▼
-          Room Flow re-emits ─▶ ViewModel rebuilds UiState ─▶ Compose recomposes
+          Transaction commits ─▶ ViewModel publishes newState ─▶ Compose recomposes
 ```
 
 ---
